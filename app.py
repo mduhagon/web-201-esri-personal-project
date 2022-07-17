@@ -9,6 +9,8 @@ from forms import RegistrationForm
 from models import User
 from sqlalchemy.exc import IntegrityError
 import hashlib
+from forms import LoginForm
+from flask_login import login_user, logout_user, login_required, current_user, login_manager, LoginManager
 
 def create_app(test_config=None):
     # create and configure the app
@@ -21,6 +23,10 @@ def create_app(test_config=None):
 
     """ uncomment at the first time running the app. Then comment back so you do not erase db content over and over """
     db_drop_and_create_all()
+
+    login_manager = LoginManager(app)
+    login_manager.login_view = 'login'
+    login_manager.login_message_category = 'info'
 
     @app.route('/', methods=['GET'])
     def home():
@@ -91,9 +97,34 @@ def create_app(test_config=None):
             
         return render_template('registration.html', form=form)          
 
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User.get_by_id(user_id)           
+
     @app.route("/login", methods=['GET', 'POST'])
     def login():
-        pass
+        # Sanity check: if the user is already authenticated then go back to home page
+        # if current_user.is_authenticated:
+        #    return redirect(url_for('home'))
+
+        form = LoginForm()
+        if form.validate_on_submit():
+            user = User.query.filter_by(display_name=form.username.data).first()
+            hashed_input_password = hashlib.md5(form.password.data.encode()).hexdigest()
+            if user and user.password == hashed_input_password:
+                login_user(user, remember=form.remember.data)
+                next_page = request.args.get('next')
+                return redirect(next_page) if next_page else redirect(url_for('home'))
+            else:
+                flash('Login Unsuccessful. Please check user name and password', 'danger')
+        return render_template('login.html', title='Login', form=form) 
+
+    @app.route("/logout")
+    @login_required
+    def logout():
+        logout_user()
+        flash(f'You have logged out!', 'success')
+        return redirect(url_for('home'))   
 
     @app.route("/api/store_item")
     def store_item():
