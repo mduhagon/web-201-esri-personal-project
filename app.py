@@ -5,6 +5,10 @@ from flask_cors import CORS
 import traceback
 from forms import NewLocationForm
 from models import setup_db, SampleLocation, db_drop_and_create_all
+from forms import RegistrationForm
+from models import User
+from sqlalchemy.exc import IntegrityError
+import hashlib
 
 def create_app(test_config=None):
     # create and configure the app
@@ -58,6 +62,38 @@ def create_app(test_config=None):
             form=form,
             map_key=os.getenv('MAPS_API_KEY', 'MAPS_API_KEY_WAS_NOT_SET?!')
         ) 
+
+    @app.route("/register", methods=['GET', 'POST'])
+    def register():
+        # Sanity check: if the user is already authenticated then go back to home page
+        # if current_user.is_authenticated:
+        #     return redirect(url_for('home'))
+
+        # Otherwise process the RegistrationForm from request (if it came)
+        form = RegistrationForm()
+        if form.validate_on_submit():
+            # hash user password, create user and store it in database
+            hashed_password = hashlib.md5(form.password.data.encode()).hexdigest()
+            user = User(
+                full_name=form.fullname.data,
+                display_name=form.username.data, 
+                email=form.email.data, 
+                password=hashed_password)
+
+            try:
+                user.insert()
+                flash(f'Account created for: {form.username.data}!', 'success')
+                return redirect(url_for('home'))
+            except IntegrityError as e:
+                flash(f'Could not register! The entered username or email might be already taken', 'danger')
+                print('IntegrityError when trying to store new user')
+                # db.session.rollback()
+            
+        return render_template('registration.html', form=form)          
+
+    @app.route("/login", methods=['GET', 'POST'])
+    def login():
+        pass
 
     @app.route("/api/store_item")
     def store_item():

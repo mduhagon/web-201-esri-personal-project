@@ -9,6 +9,8 @@ from geoalchemy2.functions import ST_DWithin
 from geoalchemy2.types import Geography
 from sqlalchemy.sql.expression import cast
 from geoalchemy2.shape import from_shape
+from flask_login import UserMixin
+from datetime import datetime
 
 db = SQLAlchemy()
 
@@ -124,4 +126,32 @@ class SampleLocation(db.Model):
         db.session.commit()
 
     def update(self):
-        db.session.commit()         
+        db.session.commit()     
+
+class User(UserMixin, db.Model):
+    __tablename__ = 'users'
+
+    id = db.Column(db.Integer, primary_key=True)
+    full_name = db.Column(db.String(200), nullable=False) # i.e Hanna Barbera
+    display_name = db.Column(db.String(20), unique=True, nullable=False) # i.e hanna_25
+    email = db.Column(db.String(120), unique=True, nullable=False) # i.e hanna@hanna-barbera.com
+    password = db.Column(db.String(32), nullable=False) 
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    @classmethod
+    def get_by_id(cls, user_id):
+        return cls.query.filter_by(id=user_id).first()
+        
+    def __repr__(self):
+        return f"User({self.id}, '{self.display_name}', '{self.email}')"      
+
+    def insert(self):
+        db.session.add(self)
+        db.session.commit()
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
+    def update(self):
+        db.session.commit()              
